@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>embytools 授权管理</title>
+<style>
+:root{
+  --bg:#f0f3f8; --panel:#ffffff; --panel2:#f7f9fc; --line:#e4e9f2;
+  --text:#1c2333; --muted:#6b7488; --brand:#3b6fe0; --brand2:#2f5cc0;
+  --ok:#18a058; --danger:#e5484d; --warn:#e8a23a;
+  --shadow:0 2px 10px rgba(30,50,90,.06);
+}
+body.dark{
+  --bg:#10141d; --panel:#181d2a; --panel2:#1e2434; --line:#2a3246;
+  --text:#e7ebf5; --muted:#8b94a9; --brand:#5c86e8; --brand2:#7296ee;
+  /* 深色底下 #18a058 只有 3.4:1，12px 字号看不清徽章文字，提亮到 4.6:1 以上 */
+  --ok:#3ddc84; --danger:#ff6b6f; --warn:#f0b862;
+  --shadow:0 2px 10px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font:14px/1.6 "Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--text)}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;outline:none}
+input:focus,select:focus{border-color:var(--brand)}
+.btn{background:var(--brand);color:#fff;border:none;border-radius:8px;padding:8px 16px}
+.btn:hover{background:var(--brand2)}
+.btn.ghost{background:transparent;color:var(--brand);border:1px solid var(--brand)}
+.btn.ghost:hover{background:rgba(59,111,224,.08)}
+.btn.sm{padding:4px 10px;font-size:12px;border-radius:6px}
+.link{color:var(--brand);background:none;border:none;padding:0;font-size:12px}
+.link.danger{color:var(--danger)}
+.muted{color:var(--muted)}
+.badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;background:var(--panel2);border:1px solid var(--line)}
+.badge.ok{color:var(--ok);border-color:var(--ok)}
+.badge.ban{color:var(--danger);border-color:var(--danger)}
+.badge.exp{color:var(--warn);border-color:var(--warn)}
+.badge.info{color:var(--brand);border-color:var(--brand)}
+/* 登录 */
+#login{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg)}
+#login .card{width:360px;max-width:calc(100vw - 32px);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px;box-shadow:var(--shadow)}
+#login h1{font-size:20px;margin:0 0 4px}
+#login .sub{font-size:12px;color:var(--muted);margin-bottom:18px}
+#login .row{margin-bottom:12px}
+#login label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+#login input{width:100%}
+#login .btn{width:100%;margin-top:6px}
+#login .err{color:var(--danger);font-size:12px;min-height:18px;margin-top:8px}
+#login .foot{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--muted)}
+/* 应用壳 */
+#app{display:none;height:100%}
+#app.on{display:flex}
+#side{width:200px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0}
+#side .logo{padding:18px 16px;font-weight:700;font-size:15px;border-bottom:1px solid var(--line)}
+#side nav{flex:1;padding:10px 8px}
+#side .nav{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:none;color:var(--text);padding:9px 10px;border-radius:8px;font-size:13px}
+#side .nav:hover{background:var(--panel2)}
+#side .nav.on{background:var(--brand);color:#fff}
+#side .nav .dot{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.85}
+#side .foot{padding:12px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+#main{flex:1;display:flex;flex-direction:column;min-width:0}
+#top{height:54px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 18px;gap:12px;flex-shrink:0}
+#top .title{font-weight:600;font-size:15px;flex:1}
+#top .ic{background:none;border:1px solid var(--line);border-radius:8px;padding:5px 10px;color:var(--text);font-size:12px}
+#content{flex:1;overflow:auto;padding:18px}
+/* 卡片与表格 */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+/* 表单：卡片里的 .row 与弹窗/登录保持一致——标签独占一行，控件整行铺开，
+   再窄的窗口也不会出现「标签把输入框挤下去」的错位。 */
+.card .row{margin-bottom:14px}
+.card .row>label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+.card .row>input,.card .row>select,.card .row>textarea{width:100%;display:block}
+.card .row>label.inline{display:inline-flex}
+.card .row>label>input[type=checkbox]{width:auto;margin-right:6px}
+.card .row>.muted{margin-top:4px;line-height:1.5}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat{padding:14px;border-radius:12px;background:var(--panel);border:1px solid var(--line)}
+.stat .n{font-size:24px;font-weight:700}
+.stat .t{font-size:12px;color:var(--muted)}
+.toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.toolbar .spacer{flex:1}
+.toolbar input,.toolbar select{height:34px}
+.toolbar input[type=checkbox]{height:auto;width:auto;margin-right:4px}
+.toolbar .inline{gap:5px}
+#content>.card,#content>.grid,#content>.errcard,#content>.empty{max-width:1180px;margin-left:auto;margin-right:auto}
+/* 状态条挂在 #main 下（不在 #content 里），要单独给同样的最大宽度，否则它比卡片宽一截 */
+#main>#storeBar{max-width:1180px;margin:14px auto 0;width:calc(100% - 36px)}
+table{width:100%;min-width:640px;border-collapse:collapse;font-size:13px;table-layout:auto}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);word-break:break-word}
+th{color:var(--muted);font-weight:600;font-size:12px;white-space:nowrap}
+td.keycell,td.datecell{white-space:nowrap}
+td.keycell span{white-space:nowrap}
+tr:hover td{background:var(--panel2)}
+pre.logs{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;font:12px/1.7 Consolas,monospace;white-space:pre-wrap;word-break:break-all;max-height:520px;overflow:auto;margin:0}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:var(--panel)}
+.alert .grow{flex:1}
+.modal-mask{position:fixed;inset:0;background:rgba(10,15,30,.45);display:none;align-items:center;justify-content:center;z-index:50}
+.modal-mask.on{display:flex}
+.modal{width:420px;max-width:92vw;max-height:calc(100vh - 40px);overflow:auto;background:var(--panel);border-radius:14px;padding:20px;box-shadow:var(--shadow)}
+.modal h3{margin:0 0 14px;font-size:16px}
+.modal .row{margin-bottom:12px}
+.modal label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+.modal input,.modal select,.modal textarea{width:100%}
+.modal .btns{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+.empty{padding:30px;text-align:center;color:var(--muted)}
+.inline{display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
+/* 单元格里不能用 inline-flex：会把 td 的 display:table-cell 顶掉，
+   该单元格脱离表格行布局，于是这一行的下边框和表头/其它行错开。
+   单元格只留 nowrap，按钮用 span.inline 包起来做横排。 */
+td.ops{white-space:nowrap}
+td.ops>span{display:inline-flex;gap:10px;align-items:center}
+/* 存储状态条 */
+.hintbar{margin-bottom:14px;padding:9px 14px;border-radius:10px;font-size:12px;line-height:1.6;display:flex;align-items:center;gap:10px}
+.hintbar .grow{flex:1}
+.hintbar.ok{background:rgba(24,160,88,.10);border:1px solid var(--ok)}
+.hintbar.warn{background:rgba(232,162,58,.14);border:1px solid var(--warn)}
+.errcard{padding:24px;text-align:center;color:var(--danger);background:var(--panel);border:1px solid var(--danger);border-radius:12px;margin-bottom:14px}
+.errcard .retry{margin-top:12px}
+#login .card .hint{font-size:11px;color:var(--muted);margin-top:14px;line-height:1.6;border-top:1px solid var(--line);padding-top:10px}
+/* 窄屏：侧栏 200px 固定会把内容压死，改成顶部横向导航；
+   操作列在窄屏允许换行，避免要横向拖表格才点得到按钮。 */
+@media (max-width:900px){
+  #app.on{flex-direction:column}
+  #side{width:100%;flex-direction:row;align-items:center;border-right:none;border-bottom:1px solid var(--line);overflow-x:auto}
+  #side .logo,#side .foot{display:none}
+  #side nav{display:flex;gap:4px;padding:8px}
+  #side .nav{width:auto;white-space:nowrap}
+  #content{padding:12px}
+  #main>#storeBar{width:calc(100% - 24px);margin:12px auto 0}
+  td.ops{white-space:normal}
+  td.ops>span{display:flex;flex-wrap:wrap;gap:8px}
+  .modal{width:100%}
+}
+@media (max-width:520px){
+  #login .card{padding:22px 18px}
+  #top{height:auto;padding:8px 12px;flex-wrap:wrap;gap:8px}
+  table{font-size:12px}
+  th,td{padding:7px 6px}
+}
+</style>
+</head>
+<body>
+
+<!-- 登录 -->
+<div id="login">
+  <div class="card">
+    <h1>embytools 授权管理</h1>
+    <div class="sub">登录后管理授权码、日志、预警、限流与 IP 封禁</div>
+    <div class="row">
+      <label>服务地址</label>
+      <input id="lBase" placeholder="https://你的服务地址" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="row">
+      <label>账号</label>
+      <input id="lUser" autocomplete="off" placeholder="请输入账号" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="row">
+      <label>密码</label>
+      <input id="lPass" type="password" autocomplete="new-password" placeholder="请输入密码" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn" id="lGo" onclick="doLogin()">登 录</button>
+    <div class="err" id="lErr"></div>
+    <div class="foot">
+      <label class="inline"><input type="checkbox" id="lRem" style="width:auto"> 记住账号（不记密码）</label>
+    </div>
+    <div class="hint">本页是本地管理界面，数据通过接口读写服务端。服务重启后数据是否保留，取决于服务端的存储配置。</div>
+  </div>
+</div>
+
+<!-- 应用 -->
+<div id="app">
+  <div id="side">
+    <div class="logo">embytools 授权</div>
+    <nav id="nav"></nav>
+    <div class="foot" id="sideFoot">v0.2 · 管理页 · 构建 2026-11-18 04:28</div>
+  </div>
+  <div id="main">
+    <div id="top">
+      <span class="title" id="pageTitle">概览</span>
+      <button class="ic" onclick="toggleTheme()" id="themeBtn">深色</button>
+      <button class="ic" onclick="logout()">退出登录</button>
+    </div>
+    <div id="storeBar" class="hintbar warn">正在检测服务端存储状态…</div>
+    <div id="content"></div>
+  </div>
+</div>
+
+<div class="modal-mask" id="mask" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalBox"></div>
+</div>
+
+<script>
+/* 令牌只放 sessionStorage（关掉标签页即失效），不再写 localStorage：
+   file:// 下所有本地页面共用一个存储分区，任何被下载后打开的 .html 都能读走
+   localStorage 里的令牌（服务端令牌 7 天有效），继而直连云函数读走全部授权码。
+   sessionStorage 同样按标签页隔离，刷新不丢登录，关窗即清。 */
+var state = { token: '', page: 'ov' };
+try { state.token = sessionStorage.getItem('ltk') || ''; } catch (e) { state.token = ''; }
+try { localStorage.removeItem('ltk'); } catch (e) {}
+var PAGES = [
+  { id:'ov',   name:'概览' },
+  { id:'lic',  name:'授权码' },
+  { id:'gen',  name:'生成' },
+  { id:'log',  name:'日志' },
+  { id:'alert',name:'预警' },
+  { id:'ip',   name:'IP 与限流' }
+];
+
+function bk(){ var b = localStorage.getItem('BK') || ''; return b.replace(/\/+$/,''); }
+/* 云函数地址白名单：只接受 https（本地调试放行 http://127.0.0.1 与 localhost）。
+   以前这个地址在任何校验之前就写进 localStorage，一旦被同机某个本地页面改写，
+   下次登录就会把明文密码 POST 到攻击者的地址上。 */
+function baseOk(u){
+  if (!u) return false;
+  if (/^https:\/\/[A-Za-z0-9._~-]+(:\d+)?(\/|$)/.test(u)) return true;
+  return /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/.test(u);
+}
+function $(s){ return document.querySelector(s); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+/* jsq 专用于拼进 onclick="fn('…')" 的参数：属性值会先做一次 HTML 实体解码，
+   所以单引号必须输出成 \&#39;（解码后是 \'），否则 IP/备注里带引号就能跳出
+   JS 字符串执行任意脚本（存储型 XSS）。 */
+function jsq(s){
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;')
+    .replace(/\\/g,'\\\\')
+    .replace(/'/g,'\\&#39;')
+    .replace(/"/g,'&quot;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
+
+function api(path, body, method){
+  method = method || (body ? 'POST' : 'GET');
+  function fire(){
+    var opts = { method: method, headers: {} };
+    if (state.token) opts.headers['Authorization'] = 'Bearer ' + state.token;
+    if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    // 12 秒超时：服务响应慢或网络挂起时，fetch 不会自己 reject，
+    // 没有这个超时页面会永远停在「加载中…」。
+    var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    if (ctrl) opts.signal = ctrl.signal;
+    var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, 12000) : null;
+    return fetch(bk()+path, opts).then(function(r){
+      if (timer) clearTimeout(timer);
+      return r.json().catch(function(){ return {}; }).then(function(j){ return { code:r.status, body:j }; });
+    }, function(e){
+      if (timer) clearTimeout(timer);
+      throw e;
+    });
+  }
+  var p = fire();
+  if (method === 'GET') {
+    for (var i = 0; i < 2; i++) {
+      p = p.catch(function(){ return new Promise(function(res){ setTimeout(function(){ res(fire()); }, 300); }); });
+    }
+  }
+  // 关键：GET 三次都失败（断网 / 地址错 / CORS / 限流）也要给调用方一个结果，
+  // 否则 .then 永不执行，页面会永远停在「加载中…」。
+  return p.catch(function(){ return { code: 0, body: {}, _err: true }; }).then(function(x){
+    // 登录接口自己的 401 是「账号或密码错误」，不能当成 token 过期去 logout，
+    // 否则错误文案会被「登录已过期」覆盖。
+    if (x.code === 401 && path !== '/api/login' && state.token) { logout(true); }
+    return x;
+  });
+}
+
+/* 只有当前页面的异步回调才允许写 DOM：切页后旧请求的结果一律丢弃，
+   避免「切换一个页面就显示少了」的竞态错乱。 */
+function onPage(id){ return state.page === id; }
+function bad(x){ return !x || x._err || x.code !== 200; }
+function errHtml(x){
+  var msg = (x && x.body && x.body.error) || '无法连接服务端';
+  var tip = x && x.code === 429 ? '操作太频繁，已被限流，请等 10 分钟再试。'
+          : '请检查服务地址、网络是否正常，或稍后重试。';
+  return '<div class="errcard"><div>⚠ ' + esc(msg) + (x && x.code ? '（HTTP ' + x.code + '）' : '') + '</div>' +
+    '<div class="muted" style="font-size:12px;margin-top:8px">' + esc(tip) + '</div>' +
+    '<div class="retry"><button class="btn sm" onclick="retryPage()">重试</button></div></div>';
+}
+function retryPage(){ go(state.page); }
+/* 写操作成功后按「当前页」重绘：以前一律 renderXxx($('#content'))，
+   用户在请求飞行中切了页，旧回调会把新页面的内容整块换掉
+   （标题还是新页标题、内容却是旧页数据）。 */
+function refresh(id, fn){ if (!onPage(id)) return; fn($('#content')); }
+// 每个异步渲染入口的统一守卫；返回 true 表示「已经处理完错误，调用方应 return」。
+function guard(id, c, x){
+  if (!onPage(id)) return true;
+  if (x && x.code === 401) return true;
+  if (bad(x)) { c.innerHTML = errHtml(x); return true; }
+  return false;
+}
+
+/* ---------- 存储状态自检：一眼看出云函数有没有连上 GitHub ----------
+   /health 是裸路由（浏览器打开会被网关当附件下载），而 /api/stats 带 CORS、
+   带登录态、且后端一并回传 storage。自检统一走 /api/stats，避免跨域误报。 */
+function checkStorage(){
+  var bar = $('#storeBar');
+  if (!bar) return;
+  api('/api/stats').then(function(x){
+    if (x && x.code === 401) {
+      // 不能直接 return：api() 的登出只把遮罩去掉，状态条会永远停在
+      // 「正在检测服务端存储状态…」，让人看不出持久化到底有没有问题。
+      bar.className = 'hintbar warn';
+      bar.innerHTML = '<span class="grow">⚠ 登录状态已失效，重新登录后会自动重新检测服务端存储。</span>';
+      return;
+    }
+    if (bad(x)) {
+      bar.className = 'hintbar warn';
+      bar.innerHTML = '<span class="grow">⚠ 暂时读取不到服务端状态' +
+        (x && x.code ? '（HTTP ' + x.code + '）' : '') +
+        '：请检查服务地址、网络是否正常；这不影响下方已加载的页面。</span>' +
+        '<button class="link" onclick="checkStorage()">重新检测</button>';
+      return;
+    }
+    var st = x.body && x.body.storage;
+    if (!st) {
+      bar.className = 'hintbar warn';
+      bar.innerHTML = '<span class="grow">⚠ 当前服务端版本较旧，无法读取存储状态。请部署最新版本后再检测。</span>' +
+        '<button class="link" onclick="checkStorage()">重新检测</button>';
+      return;
+    }
+    if (st.durable) {
+      bar.className = 'hintbar ok';
+      bar.innerHTML = '<span class="grow">✅ 持久化正常：数据保存在 <b>' + esc(st.kind === 'github' ? 'GitHub 仓库 ' + (st.target || '') : 'COS ' + (st.target || '')) + '</b>，重启不会丢失。</span>' +
+        '<button class="link" onclick="checkStorage()">重新检测</button>';
+    } else {
+      bar.className = 'hintbar warn';
+      bar.innerHTML = '<span class="grow">⚠ <b>未连接持久化存储</b>：服务端未启用持久化存储（可能是旧版本，或存储配置为空），' +
+        '授权码和日志只存在临时目录，服务重启后会全部丢失。请部署最新版本并配置存储。</span>' +
+        '<button class="link" onclick="checkStorage()">重新检测</button>';
+    }
+  });
+}
+
+function toast(msg){
+  var d = document.createElement('div');
+  d.textContent = msg;
+  d.style.cssText = 'position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--panel);padding:9px 18px;border-radius:8px;font-size:13px;z-index:99;box-shadow:0 4px 16px rgba(0,0,0,.25)';
+  document.body.appendChild(d);
+  setTimeout(function(){ d.remove(); }, 2200);
+}
+
+/* ---------- 登录 ---------- */
+function doLogin(){
+  var base = $('#lBase').value.trim().replace(/\/+$/, '');
+  if (!base) { $('#lErr').textContent = '请填写服务地址'; return; }
+  if (!baseOk(base)) { $('#lErr').textContent = '服务地址必须以 https:// 开头（本地调试可用 http://127.0.0.1）'; return; }
+  var u = $('#lUser').value.trim(), p = $('#lPass').value;
+  if (!u || !p) { $('#lErr').textContent = '请输入账号和密码'; return; }
+  $('#lErr').textContent = '登录中…';
+  var rem = $('#lRem').checked;
+  if (rem) localStorage.setItem('lu', u); else localStorage.removeItem('lu');
+  api('/api/login', { username: u, password: p }, 'POST').then(function(x){
+    if (x.body && x.body.ok) {
+      state.token = x.body.token;
+      try { sessionStorage.setItem('ltk', state.token); } catch (e) {}
+      localStorage.setItem('BK', base); // 只有登录成功才记住地址
+      enter();
+    } else {
+      $('#lErr').textContent = x._err ? '无法连接服务端，请检查地址与网络' : ((x.body && x.body.error) || '登录失败');
+    }
+  }).catch(function(){ $('#lErr').textContent = '无法连接服务端，请检查地址与网络'; });
+}
+
+function logout(expired){
+  state.token = '';
+  try { sessionStorage.removeItem('ltk'); } catch (e) {}
+  stopLogTimer();
+  $('#app').classList.remove('on');
+  $('#login').style.display = 'flex';
+  if (expired) $('#lErr').textContent = '登录已过期，请重新登录';
+}
+
+function enter(){
+  $('#login').style.display = 'none';
+  $('#app').classList.add('on');
+  var bar = $('#storeBar');
+  if (bar) { bar.className = 'hintbar warn'; bar.textContent = '正在检测服务端存储状态…'; }
+  buildNav();
+  checkStorage();
+  go(state.page || 'ov');
+}
+
+function tokenExp(){
+  if (!state.token) return true;
+  var parts = String(state.token).split(':');
+  var exp = parseInt(parts[parts.length-1], 10);
+  if (!exp) return false;
+  return Date.now()/1000 > exp;
+}
+
+/* ---------- 壳 ---------- */
+function buildNav(){
+  var html = '';
+  PAGES.forEach(function(p){
+    html += '<button class="nav" data-p="'+p.id+'" onclick="go(\''+p.id+'\')"><span class="dot"></span>'+p.name+'</button>';
+  });
+  $('#nav').innerHTML = html;
+}
+
+// 显式映射，不用字符串拼函数名：曾因 'ip' 拼成 renderIp（实际是 renderIP）
+// 抛 TypeError 且无兜底，页面永远停在「加载中…」。
+var RENDER = { ov:renderOv, lic:renderLic, gen:renderGen, log:renderLog, alert:renderAlert, ip:renderIP };
+function go(id){
+  if (id !== 'log') stopLogTimer();
+  state.page = id;
+  var metas = { ov:'概览', lic:'授权码', gen:'生成授权码', log:'日志', alert:'预警', ip:'IP 与限流' };
+  $('#pageTitle').textContent = metas[id] || id;
+  var items = document.querySelectorAll('#nav .nav');
+  items.forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-p') === id); });
+  var c = $('#content');
+  c.innerHTML = '<div class="empty">加载中…</div>';
+  try {
+    var fn = RENDER[id];
+    if (typeof fn !== 'function') throw new Error('未知页面：' + id);
+    fn(c);
+  } catch (e) {
+    c.innerHTML = '<div class="errcard">页面渲染失败：' + esc(e && e.message ? e.message : e) +
+      '<div class="retry" onclick="retryPage()">重试</div></div>';
+  }
+}
+
+/* ---------- 概览 ---------- */
+function renderOv(c){
+  api('/api/stats').then(function(x){
+    if (guard('ov', c, x)) return;
+    var s = x.body.stats || {};
+    c.innerHTML = '<div class="grid" style="margin-bottom:14px">' +
+      stat('总授权码', s.total) + stat('有效', s.valid) + stat('已封禁', s.banned) +
+      stat('已到期', s.expired) + stat('永久', s.permanent) + stat('封禁 IP', s.bannedIPs) +
+      stat('白名单 IP', s.allowIPs) + stat('限流中', s.limitedIPs) +
+    '</div><div class="card"><div class="toolbar"><b>最近日志</b><span class="spacer"></span>' +
+    '<button class="link" onclick="go(\'log\')">查看全部 →</button></div>' +
+    '<pre class="logs" id="ovLogs">加载中…</pre></div>';
+    api('/api/logs').then(function(y){
+      if (!onPage('ov')) return;
+      var box = $('#ovLogs'); if (!box) return;
+      if (bad(y)) { box.textContent = '日志读取失败，请检查服务端存储配置'; return; }
+      var logs = (y.body && y.body.logs) || [];
+      box.textContent = logs.slice(0, 20).join('\n') || '暂无日志';
+    });
+  });
+}
+function stat(t, n){ return '<div class="stat"><div class="n">'+esc(n||0)+'</div><div class="t">'+esc(t)+'</div></div>'; }
+
+/* ---------- 授权码 ---------- */
+function renderLic(c){
+  c.innerHTML = '<div class="card"><div class="toolbar">' +
+    '<input id="q" placeholder="搜索授权码 / 备注" style="width:220px" oninput="paintLic()" value="'+esc(licQ)+'">' +
+    '<select id="f" onchange="paintLic()">' +
+      '<option value="all">全部</option><option value="ok">有效</option><option value="ban">已封禁</option>' +
+      '<option value="exp">已到期</option><option value="perm">永久</option></select>' +
+    '<span class="spacer"></span>' +
+    '<button class="btn sm ghost" onclick="expCsv()">导出 CSV</button>' +
+  '</div><div id="licWrap">加载中…</div></div>';
+  $('#f').value = licF;
+  api('/api/licenses').then(function(x){
+    if (guard('lic', c, x)) return;
+    licData = x.body.licenses || [];
+    paintLic();
+  });
+}
+var licData = [];
+var licQ = '', licF = 'all';
+/* 写操作后只重取数据 + 局部重画，不重建工具栏：以前每次封禁/编辑都整页 renderLic，
+   刚输入的关键词与筛选条件被清空，批量处理时每处理一条就要重新搜一次。 */
+function reloadLic(){
+  api('/api/licenses').then(function(x){
+    if (bad(x)) { if (onPage('lic')) toast((x.body && x.body.error) || '读取授权码失败'); return; }
+    licData = x.body.licenses || [];
+    if (onPage('lic')) paintLic();
+  });
+}
+function licState(l){
+  if (l.banned) return { cls:'ban', txt:'已封禁' };
+  // 既不是永久又没有到期日 = 数据异常。服务端验码时把这种记录判为 denied
+  // （见云函数 handleVerify「授权信息异常：缺少到期时间」），页面不能显示成「永久/有效」，
+  // 否则客户一直激活失败、管理员却在列表里看到「正常」。
+  if (!l.permanent && !l.expiresAt) return { cls:'exp', txt:'数据异常' };
+  if (!l.permanent && new Date(l.expiresAt).getTime() < Date.now()) return { cls:'exp', txt:'已到期' };
+  if (l.permanent) return { cls:'info', txt:'永久' };
+  return { cls:'ok', txt:'有效' };
+}
+function paintLic(){
+  if ($('#q')) licQ = $('#q').value || '';
+  if ($('#f')) licF = $('#f').value || 'all';
+  var q = licQ.toLowerCase(), f = licF;
+  var rows = licData.filter(function(l){
+    if (q && (l.key+' '+(l.note||'')).toLowerCase().indexOf(q) < 0) return false;
+    var st = licState(l);
+    if (f === 'ban' && st.cls !== 'ban') return false;
+    if (f === 'exp' && st.cls !== 'exp') return false;
+    if (f === 'perm' && st.cls !== 'info') return false;
+    if (f === 'ok' && st.cls !== 'ok') return false;
+    return true;
+  });
+  if (!rows.length) {
+    $('#licWrap').innerHTML = '<div class="empty">' + (licData.length ? '没有匹配的授权码（换个关键词或筛选条件）' : '暂无授权码') + '</div>';
+    return;
+  }
+  var html = '<table><thead><tr><th>授权码</th><th>备注</th><th>状态</th><th>设备数</th><th>到期时间</th><th>创建时间</th><th style="width:210px">操作</th></tr></thead><tbody>';
+  rows.forEach(function(l){
+    var st = licState(l);
+    var exp = l.permanent ? '永久' : (l.expiresAt ? fmtDate(l.expiresAt) : '数据异常（无到期时间）');
+    html += '<tr>' +
+      '<td class="keycell"><span style="font-family:Consolas,monospace">'+jsq(l.key)+'</span></td>' +
+      '<td>'+esc(l.note || '—')+'</td>' +
+      '<td><span class="badge '+st.cls+'">'+st.txt+(l.banned && l.banReason ? '（'+esc(l.banReason)+'）' : '')+'</span></td>' +
+      '<td>'+ ((l.devices||[]).length + (l.maxDevices ? ' / 最多 ' + l.maxDevices + ' 台' : ' 台（不限制）')) +'</td>' +
+      '<td class="datecell">'+exp+'</td>' +
+      '<td class="muted datecell">'+fmtDate(l.createdAt)+'</td>' +
+      '<td class="ops"><span class="inline">' +
+        '<button class="link" onclick="cp(\''+jsq(l.key)+'\')">复制</button>' +
+        '<button class="link" onclick="editLic(\''+jsq(l.key)+'\')">编辑</button>' +
+            '<button class="link" onclick="serversLic(\''+jsq(l.key)+'\')">服务器</button>' +
+        (l.banned ? '<button class="link" onclick="unbanLic(\''+jsq(l.key)+'\')">解封</button>'
+                   : '<button class="link danger" onclick="banLic(\''+jsq(l.key)+'\')">封禁</button>') +
+        '<button class="link danger" onclick="delLic(\''+jsq(l.key)+'\')">删除</button>' +
+      '</span></td></tr>';
+  });
+  $('#licWrap').innerHTML = html + '</tbody></table>';
+}
+function fmtDate(s){ if(!s) return '—'; var d = new Date(s); if (isNaN(d)) return '—'; return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes()); }
+function pad(n){ return (n<10?'0':'')+n; }
+function cp(t){ navigator.clipboard.writeText(t).then(function(){ toast('已复制'); }, function(){ toast('复制失败'); }); }
+
+// 服务器绑定管理：一张授权码可以绑定多台 Emby（按台数额度）。
+function serversLic(key){
+  var l = null;
+  for (var i=0;i<licData.length;i++){ if (licData[i].key === key) l = licData[i]; }
+  if (!l) { toast('授权码不存在'); return; }
+  var list = l.devices || [];
+  var inner = '<div class="muted" style="font-size:12px;margin-bottom:8px">已绑定 '+list.length+' 台 Emby' + (l.maxDevices ? '（上限 '+l.maxDevices+' 台）' : '（不限制台数）') + '</div>';
+  if (!list.length){
+    inner += '<div class="muted" style="margin-bottom:10px">还没有绑定任何服务器。客户第一次激活时会自动绑定。</div>';
+  } else {
+    inner += '<table style="margin-bottom:10px"><thead><tr><th>ServerId</th><th style="width:80px">操作</th></tr></thead><tbody>';
+    for (var j=0;j<list.length;j++){
+      inner += '<tr><td class="keycell">'+esc(list[j])+'</td><td><button class="link" onclick="unbindServer(\''+jsq(key)+'\',\''+jsq(list[j])+'\')">解绑</button></td></tr>';
+    }
+    inner += '</tbody></table>';
+  }
+  inner += '<div class="row"><label>手动绑定一台（填 Emby ServerId）</label><input id="mSid" placeholder="32 位十六进制，如 0a1b2c3d4e5f60718293a4b5c6d7e8f9"></div>';
+  openModal('绑定服务器 · '+key, inner, function(){
+    var sid = ($('#mSid').value||'').trim().toLowerCase();
+    if (!sid) { toast('请填 ServerId'); return; }
+    // 服务端只认 32 位小写十六进制，先在本地拦一次，省一个来回
+    if (!/^[0-9a-f]{32}$/.test(sid)) { toast('ServerId 应为 32 位十六进制'); return; }
+    api('/api/license/servers', {key:key, action:'add', serverId:sid}, 'POST').then(function(j){
+      var b = (j && j.body) || {};
+      if (j.code !== 200 || !b.ok){ toast(b.error || '绑定失败'); return; }
+      closeModal(); toast('已绑定'); reloadLic();
+    });
+  });
+}
+
+function unbindServer(key, sid){
+  api('/api/license/servers', {key:key, action:'remove', serverId:sid}, 'POST').then(function(j){
+    var b = (j && j.body) || {};
+    if (j.code !== 200 || !b.ok){ toast(b.error || '解绑失败'); return; }
+    toast('已解绑');
+    // 必须重开弹窗里的列表：以前只 go('lic')，弹窗还盖在屏幕上、里面是解绑前的快照，
+    // 再点「确定」就用手填的 ServerId 反向绑回去。
+    api('/api/licenses').then(function(x){
+      if (bad(x)) { closeModal(); reloadLic(); return; }
+      licData = x.body.licenses || [];
+      if (onPage('lic')) { paintLic(); serversLic(key); }
+    });
+  });
+}
+
+function editLic(key){
+  var l = licData.find(function(x){ return x.key === key; });
+  if (!l) return;
+  var expv = (l.expiresAt ? new Date(l.expiresAt) : new Date(Date.now()+30*864e5));
+  var expLocal = expv.getFullYear()+'-'+pad(expv.getMonth()+1)+'-'+pad(expv.getDate())+'T'+pad(expv.getHours())+':'+pad(expv.getMinutes());
+  openModal('编辑授权码', '<div class="row"><label>备注</label><input id="mNote" value="'+esc(l.note||'')+'"></div>' +
+    '<div class="row"><label><input type="checkbox" id="mPerm" style="width:auto"'+(l.permanent?' checked':'')+' onchange="togglePerm()"> 永久（无到期）</label></div>' +
+    '<div class="row" id="mExpRow"><label>到期时间</label><input type="datetime-local" id="mExp" value="'+expLocal+'"></div>' +
+    '<div class="row"><label>设备数量限制</label><input type="number" id="mMax" min="0" value="'+(l.maxDevices||0)+'">' +
+      '<div class="muted" style="font-size:11px;margin-top:4px">这张授权码允许在几台设备上使用。填 0 = 不限制台数。</div></div>' +
+    '<div class="row"><label><input type="checkbox" id="mClear" style="width:auto"> 清空已登记设备（让旧设备重新计数）</label></div>',
+    function(){
+      var body = { key: key, note: $('#mNote').value };
+      var perm = $('#mPerm').checked;
+      if (!perm && !$('#mExp').value) { toast('请选择到期时间'); return; }
+      body.expiresAt = perm ? 'permanent' : new Date($('#mExp').value).toISOString();
+      body.maxDevices = parseInt($('#mMax').value, 10) || 0;
+      body.clearDevices = $('#mClear').checked;
+      api('/api/license/update', body, 'POST').then(function(x){
+        closeModal();
+        if (x._err || !x.body || !x.body.ok) toast((x.body && x.body.error) || '保存失败，请检查网络');
+        else { toast('已保存'); reloadLic(); }
+      }).catch(function(){ toast('保存失败，请检查网络'); });
+    });
+  togglePerm();
+}
+function togglePerm(){ $('#mExpRow').style.display = $('#mPerm').checked ? 'none' : 'block'; }
+function banLic(key){
+  openModal('封禁授权码', '<div class="row"><label>封禁原因</label><input id="mReason" placeholder="如：退款 / 转卖"></div>',
+    function(){
+      api('/api/license/ban', { key: key, reason: $('#mReason').value }, 'POST').then(function(x){
+        closeModal();
+        if (x._err || !x.body || !x.body.ok) toast((x.body && x.body.error) || '操作失败，请检查网络');
+        else { toast('已封禁'); reloadLic(); }
+      }).catch(function(){ closeModal(); toast('操作失败，请检查网络'); });
+    });
+}
+function unbanLic(key){
+  openModal('解除封禁', '<div class="row">确定解除 <b>'+esc(key)+'</b> 的封禁吗？解除后该授权码会立刻恢复可用。</div>',
+    function(){
+      api('/api/license/unban', { key: key }, 'POST').then(function(x){
+        closeModal();
+        if (x._err || !x.body || !x.body.ok) toast((x.body && x.body.error) || '操作失败，请检查网络');
+        else { toast('已解封'); reloadLic(); }
+      });
+    });
+}
+function delLic(key){
+  openModal('删除授权码', '<div class="row">确定删除 <b>'+esc(key)+'</b> 吗？此操作不可恢复。</div>',
+    function(){
+      api('/api/license/delete', { key: key }, 'POST').then(function(x){
+        closeModal();
+        if (x._err || !x.body || !x.body.ok) toast((x.body && x.body.error) || '操作失败，请检查网络');
+        else { toast('已删除'); reloadLic(); }
+      }).catch(function(){ closeModal(); toast('操作失败，请检查网络'); });
+    });
+}
+function expCsv(){
+  var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, 12000) : null;
+  var opts = { headers: { 'Authorization': 'Bearer '+state.token } };
+  if (ctrl) opts.signal = ctrl.signal;
+  fetch(bk()+'/api/license/export', opts)
+    .then(function(r){
+      if (timer) clearTimeout(timer);
+      if (r.status === 401) { logout(true); throw new Error('401'); }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.blob();
+    })
+    .then(function(b){
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(b); a.download = 'licenses.csv'; a.click();
+      URL.revokeObjectURL(a.href);
+    })
+    .catch(function(e){
+      if (timer) clearTimeout(timer);
+      if (e && e.message === '401') return; // 已按登录过期处理
+      toast('导出失败，请检查服务地址与网络');
+    });
+}
+
+/* ---------- 生成 ---------- */
+function renderGen(c){
+  c.innerHTML = '<div class="card" style="max-width:520px"><h3 style="margin-top:0">生成授权码</h3>' +
+    '<div class="row"><label>备注（可选）</label><input id="gNote" placeholder="给谁用"></div>' +
+    '<div class="row"><label>类型</label><select id="gType" onchange="toggleGen()">' +
+      '<option value="perm">永久</option><option value="temp">限时</option></select></div>' +
+    '<div class="row" id="gExpRow" style="display:none"><label>到期时间</label><input type="datetime-local" id="gExp"></div>' +
+    '<div class="row"><label>设备数量限制</label><input type="number" id="gMax" min="0" value="1">' +
+      '<div class="muted" style="font-size:11px">默认 1 台（这个授权码只能在一台设备上用）。填 0 = 不限制台数。</div></div>' +
+    '<div class="row"><label>生成数量（1-20）</label><input type="number" id="gN" min="1" max="20" value="1"></div>' +
+    '<button class="btn" id="gBtn" onclick="doGen()">生成</button>' +
+    '<div id="gOut" style="margin-top:14px"></div></div>';
+}
+function toggleGen(){ $('#gExpRow').style.display = $('#gType').value === 'temp' ? 'block' : 'none'; }
+function doGen(){
+  var n = Math.max(1, Math.min(20, parseInt($('#gN').value, 10) || 1));
+  var body = { note: $('#gNote').value };
+  if ($('#gType').value === 'temp') {
+    var v = $('#gExp').value;
+    if (!v) { toast('请选择到期时间'); return; }
+    body.expiresAt = new Date(v).toISOString();
+  } else body.expiresAt = 'permanent';
+  body.maxDevices = parseInt($('#gMax').value, 10) || 0;
+  // 串行 + 按钮禁用：以前一次点击并发 N 个 POST，冷启动时连点两下就是 2N 个授权码入库，
+  // 而且并发回包顺序不定，生成结果列表和点击顺序对不上。
+  var btn = $('#gBtn');
+  if (btn && btn.disabled) return;
+  if (btn) { btn.disabled = true; btn.textContent = '生成中…'; }
+  var out = [], fail = 0, i = 0;
+  function step(){
+    if (i >= n) {
+      if (btn) { btn.disabled = false; btn.textContent = '生成'; }
+      paintGenOut(out, fail);
+      return;
+    }
+    i++;
+    var box = $('#gOut');
+    if (box) box.innerHTML = '<div class="muted">生成中（' + i + '/' + n + '）…</div>';
+    api('/api/license/generate', body, 'POST').then(function(x){
+      if (x.body && x.body.ok && x.body.license) out.push(x.body.license); else fail++;
+      step();
+    });
+  }
+  step();
+}
+function paintGenOut(list, fail){
+  var html = '';
+  list.forEach(function(l){
+    html += '<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--panel2)">' +
+      '<div style="font-family:Consolas,monospace;font-size:15px">'+jsq(l.key)+'</div>' +
+      '<div class="muted" style="font-size:12px">'+(l.permanent?'永久':('到期 '+fmtDate(l.expiresAt)))+(l.maxDevices?' · 限 '+l.maxDevices+' 台':'')+'</div>' +
+      '<button class="link" onclick="cp(\''+jsq(l.key)+'\')">复制</button></div>';
+  });
+  if (list.length) html += '<button class="btn sm" onclick="cp(\''+jsq(list.map(function(l){return l.key}).join('\n'))+'\')">一键复制全部</button>';
+  if (fail) html += '<div class="muted" style="margin-top:8px">' + fail + ' 个生成失败</div>';
+  $('#gOut').innerHTML = html || '<div class="muted">生成失败</div>';
+}
+
+/* ---------- 日志 ---------- */
+function renderLog(c){
+  c.innerHTML = '<div class="card"><div class="toolbar">' +
+    '<input id="lq" placeholder="搜索日志" style="width:240px" oninput="paintLog()">' +
+    '<label class="inline muted"><input type="checkbox" id="lAuto" style="width:auto" onchange="logAuto()"> 自动刷新</label>' +
+    '<span class="muted" style="font-size:12px;margin-left:6px">最新在最上面</span>' +
+    '<span class="spacer"></span><button class="link" onclick="reloadLog()">刷新</button>' +
+  '</div><pre class="logs" id="logBox">加载中…</pre></div>';
+  logData = [];
+  api('/api/logs').then(function(x){
+    if (guard('log', c, x)) return;
+    logData = x.body.logs || [];
+    paintLog();
+  });
+}
+var logData = [];
+function paintLog(){
+  var q = ($('#lq') ? ($('#lq').value || '') : '').toLowerCase();
+  var list = logData.filter(function(l){ return !q || l.toLowerCase().indexOf(q) >= 0; });
+  var box = $('#logBox');
+  if (box) box.textContent = list.join('\n') || '暂无日志';
+}
+/* 「刷新」以前调 paintLog(true)，但 force 参数根本没被使用——点刷新只有本地重排，
+   一个网络请求都不发，新日志永远看不到，看起来就像「日志丢了一堆」。 */
+function reloadLog(){
+  var box = $('#logBox');
+  if (box && !logData.length) box.textContent = '加载中…';
+  api('/api/logs').then(function(x){
+    if (!onPage('log')) return;
+    if (bad(x)) { if (box) box.textContent = '日志读取失败：' + ((x.body && x.body.error) || '请检查服务端存储配置'); return; }
+    logData = x.body.logs || [];
+    paintLog();
+  });
+}
+function stopLogTimer(){
+  if (window._logTimer) { clearInterval(window._logTimer); window._logTimer = null; }
+}
+function logAuto(){
+  stopLogTimer();
+  if ($('#lAuto') && $('#lAuto').checked) {
+    window._logTimer = setInterval(function(){
+      if (state.page !== 'log') { stopLogTimer(); return; }
+      api('/api/logs').then(function(x){
+        if (!onPage('log') || bad(x)) return;
+        logData = x.body.logs || []; paintLog();
+      });
+    }, 5000);
+  }
+}
+
+/* ---------- 预警 ---------- */
+function renderAlert(c){
+  c.innerHTML = '<div class="card"><div class="toolbar"><b>异常预警</b><span class="spacer"></span>' +
+    '<button class="link" onclick="dismissAll()">全部已读</button></div><div id="alWrap">加载中…</div></div>';
+  api('/api/alerts').then(function(x){
+    if (guard('alert', c, x)) return;
+    var list = x.body.alerts || [];
+    var html = '';
+    list.forEach(function(a){
+      var id = [a.time, a.ip, a.key, a.type].join('|');
+      html += '<div class="alert"><div class="grow">' +
+        '<b>'+esc(a.type === 'rate_limit' ? '同 IP 被限流多次' : (a.type === 'key_per_ip' ? '同 IP 高频用码' : '同 IP 大量失败'))+'</b> ' +
+        (a.dismissed ? '<span class="badge">已读</span>' : '') +
+        '<div class="muted" style="font-size:12px">'+esc(a.detail)+'</div>' +
+        '<div class="muted" style="font-size:12px">'+fmtDate(a.time)+' · IP '+esc(a.ip||'—')+'</div></div>' +
+        (a.dismissed ? '' : '<button class="link" onclick="dismissOne(\''+jsq(id)+'\')">已读</button>') +
+      '</div>';
+    });
+    $('#alWrap').innerHTML = html || '<div class="empty">暂无预警</div>';
+  });
+}
+function dismissOne(id){
+  api('/api/alerts/dismiss', { id: id }, 'POST').then(function(x){
+    if (x._err || !x.body || !x.body.ok) { toast((x.body && x.body.error) || '操作失败'); return; }
+    refresh('alert', renderAlert);
+  }).catch(function(){ toast('操作失败，请检查网络'); });
+}
+function dismissAll(){
+  api('/api/alerts').then(function(x){
+    if (bad(x)) { toast((x.body && x.body.error) || '读取预警失败'); return; }
+    var list = x.body.alerts || [];
+    var n = 0, total = 0;
+    list.forEach(function(a){ if (!a.dismissed) total++; });
+    if (!total) { toast('没有未读预警'); return; }
+    list.forEach(function(a){
+      if (a.dismissed) return;
+      var id = [a.time, a.ip, a.key, a.type].join('|');
+      api('/api/alerts/dismiss', { id: id }, 'POST').then(function(y){
+        if (y._err || !y.body || !y.body.ok) toast((y.body && y.body.error) || '部分操作失败');
+        if (++n === total) refresh('alert', renderAlert);
+      });
+    });
+  });
+}
+
+/* ---------- IP 封禁 / 限流 / 白名单 ---------- */
+function renderIP(c){
+  c.innerHTML =
+    '<div class="card"><h3>限流状态（自动过期，重启后重置）</h3>' +
+      '<div class="muted" id="ipRule">正在读取规则…</div>' +
+      '<div class="toolbar" style="margin-top:10px">' +
+        '<input id="rIp" placeholder="要解除限流的 IP（留空 = 全部）" style="width:240px">' +
+        '<button class="btn sm" onclick="doRateReset()">解除限流</button>' +
+      '</div><div id="rateWrap">加载中…</div></div>' +
+
+    '<div class="card"><h3>永久白名单（持久保存，重启不丢）</h3>' +
+      '<div class="toolbar">' +
+        '<input id="aIp" placeholder="IP 地址，如 1.2.3.4" style="width:200px">' +
+        '<button class="btn sm" onclick="doIPAllow(false)">加入白名单</button>' +
+      '</div><div id="allowWrap">加载中…</div></div>' +
+
+    '<div class="card"><h3>永久封禁（只能手动解除）</h3>' +
+      '<div class="toolbar">' +
+        '<input id="nip" placeholder="IP 地址，如 1.2.3.4" style="width:200px">' +
+        '<input id="nreason" placeholder="封禁原因（可选）" style="width:220px">' +
+        '<button class="btn sm" onclick="doIPBan()">封禁 IP</button>' +
+      '</div><div id="ipWrap">加载中…</div></div>';
+
+  api('/api/ips').then(function(x){
+    if (guard('ip', c, x)) return;
+    var bans = (x.body && x.body.ips) || [];
+    var allow = (x.body && x.body.allow) || [];
+    var rule = $('#ipRule');
+    if (rule) rule.textContent = '每 IP 每 ' + (x.body.windowMin || 10) + ' 分钟最多 ' + (x.body.limit || 5) + ' 次，超出返回 429「请求频繁」；白名单不受限制。';
+
+    var aw = $('#allowWrap');
+    if (aw) {
+      if (!allow.length) aw.innerHTML = '<div class="empty">暂无白名单 IP</div>';
+      else {
+        var ah = '<table><thead><tr><th>IP</th><th style="width:90px">操作</th></tr></thead><tbody>';
+        allow.forEach(function(ip){
+          ah += '<tr><td style="font-family:Consolas,monospace">'+esc(ip)+'</td>' +
+            '<td><button class="link" onclick="doIPAllow(true,\''+jsq(ip)+'\')">移出</button></td></tr>';
+        });
+        aw.innerHTML = ah + '</tbody></table>';
+      }
+    }
+
+    var bw = $('#ipWrap');
+    if (bw) {
+      if (!bans.length) bw.innerHTML = '<div class="empty">暂无永久封禁 IP</div>';
+      else {
+        var bh = '<table><thead><tr><th>IP</th><th>原因</th><th>封禁时间</th><th style="width:80px">操作</th></tr></thead><tbody>';
+        bans.forEach(function(b){
+          bh += '<tr><td style="font-family:Consolas,monospace">'+jsq(b.ip)+'</td><td>'+esc(b.reason||'—')+'</td>' +
+            '<td class="datecell muted">'+fmtDate(b.createdAt)+'</td>' +
+            '<td><button class="link" onclick="doIPUnban(\''+jsq(b.ip)+'\')">解除</button></td></tr>';
+        });
+        bw.innerHTML = bh + '</tbody></table>';
+      }
+    }
+  });
+
+  api('/api/ip/watch').then(function(x){
+    if (guard('ip', c, x)) return;
+    var w = $('#rateWrap'); if (!w) return;
+    if (x._err || !x.body || !x.body.ok) { w.innerHTML = errHtml(x); return; }
+    var list = x.body.ips || [];
+    if (!list.length) { w.innerHTML = '<div class="empty">当前没有被限流的 IP</div>'; return; }
+    var html = '<table><thead><tr><th>IP</th><th>被限流次数</th><th>最近一次</th><th>还需等待</th><th style="width:100px">操作</th></tr></thead><tbody>';
+    list.forEach(function(r){
+      html += '<tr><td style="font-family:Consolas,monospace">'+jsq(r.ip)+'</td>' +
+        '<td>'+r.hits+' 次</td><td class="datecell muted">'+fmtDate(r.lastAt)+'</td>' +
+        '<td class="muted">'+(r.retryAfter ? r.retryAfter+' 秒' : '—')+'</td>' +
+        '<td><button class="link" onclick="doRateReset(\''+jsq(r.ip)+'\')">解除限流</button></td></tr>';
+    });
+    w.innerHTML = html + '</tbody></table>';
+  });
+}
+function doIPBan(){
+  var ip = $('#nip').value.trim();
+  if (!ip) { toast('请填写 IP'); return; }
+  api('/api/ip/ban', { ip: ip, reason: $('#nreason').value.trim() }, 'POST').then(function(x){
+    if (x._err || !x.body || !x.body.ok) toast((x.body && x.body.error) || '操作失败，请检查网络');
+    else { toast('已永久封禁'); refresh('ip', renderIP); }
+  }).catch(function(){ toast('操作失败，请检查网络'); });
+}
+function doIPUnban(ip){
+  openModal('解除 IP 封禁', '<div class="row">确定解除 <b>'+esc(ip)+'</b> 的永久封禁吗？解除后这个 IP 可以立刻重新调用服务。</div>',
+    function(){
+      api('/api/ip/unban', { ip: ip }, 'POST').then(function(x){
+        closeModal();
+        if (x._err || !x.body || !x.body.ok) toast((x.body && x.body.error) || '操作失败，请检查网络');
+        else { toast('已解除封禁'); refresh('ip', renderIP); }
+      });
+    });
+}
+function doIPAllow(add, ip){
+  var v = ip || ($('#aIp') ? $('#aIp').value.trim() : '');
+  if (!v) { toast('请填写 IP'); return; }
+  var go2 = function(){
+    api('/api/ip/allow', { ip: v, remove: !!add }, 'POST').then(function(x){
+      closeModal();
+      if (x._err || !x.body || !x.body.ok) toast((x.body && x.body.error) || '操作失败，请检查网络');
+      else { toast(add ? '已移出白名单' : '已加入白名单'); refresh('ip', renderIP); }
+    });
+  };
+  if (!add) { go2(); return; }
+  openModal('移出白名单', '<div class="row">确定把 <b>'+esc(v)+'</b> 移出白名单吗？移出后它会重新受到每 IP 限流。</div>', go2);
+}
+function doRateReset(ip){
+  var v = ip || ($('#rIp') ? $('#rIp').value.trim() : '');
+  var go2 = function(){
+    api('/api/ip/ratelimit/reset', { ip: v }, 'POST').then(function(x){
+      closeModal();
+      if (x._err || !x.body || !x.body.ok) toast((x.body && x.body.error) || '操作失败，请检查网络');
+      else { toast(v ? '已解除该 IP 的限流' : '已清空全部限流计数'); refresh('ip', renderIP); }
+    });
+  };
+  // 留空 = 清空全部 IP 的限流计数，等于把这道防线整体放开，必须确认
+  if (!v) {
+    openModal('清空全部限流', '<div class="row">输入框是空的，点确定会<b>清空所有 IP 的限流计数</b>——正在被限流的刷子会立刻恢复额度。确定吗？</div>', go2);
+    return;
+  }
+  go2();
+}
+
+/* ---------- 弹窗 ---------- */
+function openModal(title, inner, onOk){
+  $('#modalBox').innerHTML = '<h3>'+esc(title)+'</h3>'+inner+'<div class="btns">' +
+    '<button class="btn ghost" onclick="closeModal()">取消</button>' +
+    '<button class="btn" id="mOk">确定</button></div>';
+  $('#mask').classList.add('on');
+  window._mBusy = false;
+  // 确定按钮防重复提交：回调里都是「回包后才 closeModal」，这期间按钮可连点，
+  // 封禁/删除/绑定会被各执行两次（第二次 404，看起来像操作失败）。
+  window._mOk = function(){
+    if (window._mBusy) return;
+    window._mBusy = true;
+    var b = $('#mOk');
+    if (b) { b.disabled = true; b.textContent = '处理中…'; }
+    onOk();
+    // 兜底恢复：网络挂住时不让按钮永久卡在「处理中」
+    setTimeout(function(){
+      if (!window._mBusy) return;
+      window._mBusy = false;
+      var b2 = $('#mOk');
+      if (b2) { b2.disabled = false; b2.textContent = '确定'; }
+    }, 6000);
+  };
+  $('#mOk').onclick = function(){ window._mOk(); };
+  setTimeout(function(){
+    var t = $('#mNote') || $('#mReason') || $('#mExp') || $('#mSid');
+    if (t) t.focus();
+  }, 50);
+}
+function closeModal(){
+  $('#mask').classList.remove('on');
+  window._mOk = null;
+  window._mBusy = false;
+}
+
+/* ---------- 主题 ---------- */
+function toggleTheme(){
+  var dark = document.body.classList.toggle('dark');
+  localStorage.setItem('theme', dark ? 'dark' : 'light');
+  $('#themeBtn').textContent = dark ? '浅色' : '深色';
+}
+
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape' && $('#mask') && $('#mask').classList.contains('on')) closeModal();
+});
+
+/* ---------- 启动 ---------- */
+(function boot(){
+  var theme = localStorage.getItem('theme');
+  if (theme === 'dark') { document.body.classList.add('dark'); $('#themeBtn').textContent = '浅色'; }
+  var base = localStorage.getItem('BK');
+  if (base) $('#lBase').value = base;
+  var u = localStorage.getItem('lu');
+  if (u) { $('#lUser').value = u; $('#lRem').checked = true; }
+  if (state.token && !tokenExp()) { enter(); }
+})();
+</script>
+</body>
+</html>
