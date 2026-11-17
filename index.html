@@ -162,7 +162,7 @@ td.ops>span{display:inline-flex;gap:10px;align-items:center}
     <button class="btn" id="lGo" onclick="doLogin()">登 录</button>
     <div class="err" id="lErr"></div>
     <div class="foot">
-      <label class="inline"><input type="checkbox" id="lRem" style="width:auto"> 记住账号（不记密码）</label>
+      <span class="muted" style="font-size:12px">首次登录成功后，服务地址、账号和密码会保存在本机浏览器，下次打开自动登录。</span>
     </div>
     <div class="hint">本页是本地管理界面，数据通过接口读写服务端。服务重启后数据是否保留，取决于服务端的存储配置。</div>
   </div>
@@ -173,7 +173,7 @@ td.ops>span{display:inline-flex;gap:10px;align-items:center}
   <div id="side">
     <div class="logo">embytools 授权</div>
     <nav id="nav"></nav>
-    <div class="foot" id="sideFoot">v0.2 · 管理页 · 构建 2026-11-18 04:28</div>
+    <div class="foot" id="sideFoot">v0.2 · 管理页 · 构建 2026-11-18 05:00</div>
   </div>
   <div id="main">
     <div id="top">
@@ -349,13 +349,13 @@ function doLogin(){
   var u = $('#lUser').value.trim(), p = $('#lPass').value;
   if (!u || !p) { $('#lErr').textContent = '请输入账号和密码'; return; }
   $('#lErr').textContent = '登录中…';
-  var rem = $('#lRem').checked;
-  if (rem) localStorage.setItem('lu', u); else localStorage.removeItem('lu');
   api('/api/login', { username: u, password: p }, 'POST').then(function(x){
     if (x.body && x.body.ok) {
       state.token = x.body.token;
       try { sessionStorage.setItem('ltk', state.token); } catch (e) {}
-      localStorage.setItem('BK', base); // 只有登录成功才记住地址
+      localStorage.setItem('BK', base);
+      localStorage.setItem('lu', u);
+      localStorage.setItem('lp', p);
       enter();
     } else {
       $('#lErr').textContent = x._err ? '无法连接服务端，请检查地址与网络' : ((x.body && x.body.error) || '登录失败');
@@ -979,8 +979,11 @@ document.addEventListener('keydown', function(e){
   var base = localStorage.getItem('BK');
   if (base) $('#lBase').value = base;
   var u = localStorage.getItem('lu');
-  if (u) { $('#lUser').value = u; $('#lRem').checked = true; }
+  if (u) $('#lUser').value = u;
+  var p = localStorage.getItem('lp');
+  if (p) $('#lPass').value = p;
   if (state.token && !tokenExp()) { enter(); }
+  else if (base && u && p) setTimeout(doLogin, 400);
 })();
 </script>
 </body>
