@@ -173,7 +173,7 @@ td.ops>span{display:inline-flex;gap:10px;align-items:center}
   <div id="side">
     <div class="logo">embytools 授权</div>
     <nav id="nav"></nav>
-    <div class="foot" id="sideFoot">v0.2 · 管理页 · 构建 2026-11-18 05:32</div>
+    <div class="foot" id="sideFoot">v0.2 · 管理页 · 构建 2026-11-18 06:23</div>
   </div>
   <div id="main">
     <div id="top">
@@ -531,13 +531,14 @@ function serversLic(key){
   for (var i=0;i<licData.length;i++){ if (licData[i].key === key) l = licData[i]; }
   if (!l) { toast('授权码不存在'); return; }
   var list = l.devices || [];
+  var names = l.deviceNames || {};
   var inner = '<div class="muted" style="font-size:12px;margin-bottom:8px">已绑定 '+list.length+' 台 Emby' + (l.maxDevices ? '（上限 '+l.maxDevices+' 台）' : '（不限制台数）') + '</div>';
   if (!list.length){
     inner += '<div class="muted" style="margin-bottom:10px">还没有绑定任何服务器。客户第一次激活时会自动绑定。</div>';
   } else {
-    inner += '<table style="margin-bottom:10px"><thead><tr><th>ServerId</th><th style="width:80px">操作</th></tr></thead><tbody>';
+    inner += '<table style="margin-bottom:10px"><thead><tr><th>Emby 名称</th><th>ServerId</th><th style="width:80px">操作</th></tr></thead><tbody>';
     for (var j=0;j<list.length;j++){
-      inner += '<tr><td class="keycell">'+esc(list[j])+'</td><td><button class="link" onclick="unbindServer(\''+jsq(key)+'\',\''+jsq(list[j])+'\')">解绑</button></td></tr>';
+      inner += '<tr><td>'+esc(names[list[j]] || '—')+'</td><td class="keycell">'+esc(list[j])+'</td><td><button class="link" onclick="unbindServer(\''+jsq(key)+'\',\''+jsq(list[j])+'\')">解绑</button></td></tr>';
     }
     inner += '</tbody></table>';
   }
