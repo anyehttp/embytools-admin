@@ -173,7 +173,7 @@ td.ops>span{display:inline-flex;gap:10px;align-items:center}
   <div id="side">
     <div class="logo">embytools 授权</div>
     <nav id="nav"></nav>
-    <div class="foot" id="sideFoot">v0.2 · 管理页 · 构建 2026-11-18 05:00</div>
+    <div class="foot" id="sideFoot">v0.2 · 管理页 · 构建 2026-11-18 05:32</div>
   </div>
   <div id="main">
     <div id="top">
@@ -499,7 +499,7 @@ function paintLic(){
     $('#licWrap').innerHTML = '<div class="empty">' + (licData.length ? '没有匹配的授权码（换个关键词或筛选条件）' : '暂无授权码') + '</div>';
     return;
   }
-  var html = '<table><thead><tr><th>授权码</th><th>备注</th><th>状态</th><th>设备数</th><th>到期时间</th><th>创建时间</th><th style="width:210px">操作</th></tr></thead><tbody>';
+  var html = '<table><thead><tr><th>授权码</th><th>备注</th><th>状态</th><th>已绑服务器</th><th>到期时间</th><th>创建时间</th><th style="width:210px">操作</th></tr></thead><tbody>';
   rows.forEach(function(l){
     var st = licState(l);
     var exp = l.permanent ? '永久' : (l.expiresAt ? fmtDate(l.expiresAt) : '数据异常（无到期时间）');
@@ -578,9 +578,9 @@ function editLic(key){
   openModal('编辑授权码', '<div class="row"><label>备注</label><input id="mNote" value="'+esc(l.note||'')+'"></div>' +
     '<div class="row"><label><input type="checkbox" id="mPerm" style="width:auto"'+(l.permanent?' checked':'')+' onchange="togglePerm()"> 永久（无到期）</label></div>' +
     '<div class="row" id="mExpRow"><label>到期时间</label><input type="datetime-local" id="mExp" value="'+expLocal+'"></div>' +
-    '<div class="row"><label>设备数量限制</label><input type="number" id="mMax" min="0" value="'+(l.maxDevices||0)+'">' +
-      '<div class="muted" style="font-size:11px;margin-top:4px">这张授权码允许在几台设备上使用。填 0 = 不限制台数。</div></div>' +
-    '<div class="row"><label><input type="checkbox" id="mClear" style="width:auto"> 清空已登记设备（让旧设备重新计数）</label></div>',
+    '<div class="row"><label>可绑定服务器数</label><input type="number" id="mMax" min="0" value="'+(l.maxDevices||0)+'">' +
+      '<div class="muted" style="font-size:11px;margin-top:4px">这张授权码允许绑定几台 Emby 服务器。填 0 = 不限制。</div></div>' +
+    '<div class="row"><label><input type="checkbox" id="mClear" style="width:auto"> 清空已绑定服务器（重新计数）</label></div>',
     function(){
       var body = { key: key, note: $('#mNote').value };
       var perm = $('#mPerm').checked;
@@ -658,8 +658,8 @@ function renderGen(c){
     '<div class="row"><label>类型</label><select id="gType" onchange="toggleGen()">' +
       '<option value="perm">永久</option><option value="temp">限时</option></select></div>' +
     '<div class="row" id="gExpRow" style="display:none"><label>到期时间</label><input type="datetime-local" id="gExp"></div>' +
-    '<div class="row"><label>设备数量限制</label><input type="number" id="gMax" min="0" value="1">' +
-      '<div class="muted" style="font-size:11px">默认 1 台（这个授权码只能在一台设备上用）。填 0 = 不限制台数。</div></div>' +
+    '<div class="row"><label>可绑定服务器数</label><input type="number" id="gMax" min="0" value="1">' +
+      '<div class="muted" style="font-size:11px">默认 1 台（只能绑定一台 Emby 服务器）。填 0 = 不限制。</div></div>' +
     '<div class="row"><label>生成数量（1-20）</label><input type="number" id="gN" min="1" max="20" value="1"></div>' +
     '<button class="btn" id="gBtn" onclick="doGen()">生成</button>' +
     '<div id="gOut" style="margin-top:14px"></div></div>';
