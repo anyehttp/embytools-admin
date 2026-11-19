@@ -731,34 +731,50 @@ function paintGenOut(list, fail){
 /* ---------- 日志 ---------- */
 function renderLog(c){
   c.innerHTML = '<div class="card"><div class="toolbar">' +
-    '<input id="lq" placeholder="搜索日志" style="width:240px" oninput="paintLog()">' +
+    '<input id="lq" placeholder="搜索当前页" style="width:180px" oninput="paintLog()">' +
+    '从 <input type="date" id="lFrom" style="width:140px">' +
+    '到 <input type="date" id="lTo" style="width:140px">' +
+    '<select id="lSize" style="width:96px"><option>100</option><option selected>200</option><option>500</option><option>1000</option></select>' +
+    '<button class="btn sm" onclick="reloadLog(1)">查询</button>' +
     '<label class="inline muted"><input type="checkbox" id="lAuto" style="width:auto" onchange="logAuto()"> 自动刷新</label>' +
-    '<span class="muted" style="font-size:12px;margin-left:6px">最新在最上面</span>' +
-    '<span class="spacer"></span><button class="link" onclick="reloadLog()">刷新</button>' +
+    '<span class="spacer"></span><button class="link" onclick="reloadLog(logPage)">刷新</button>' +
+  '</div><div class="toolbar" style="margin-top:6px">' +
+    '<button class="btn sm" id="lPrev" onclick="reloadLog(logPage-1)">上一页</button>' +
+    '<span class="muted" id="lPage">第 1 页</span>' +
+    '<button class="btn sm" id="lNext" onclick="reloadLog(logPage+1)">下一页</button>' +
+    '<span class="muted" style="font-size:12px">最新在最上面；搜索只过滤当前页</span>' +
   '</div><pre class="logs" id="logBox">加载中…</pre></div>';
-  logData = [];
-  api('/api/logs').then(function(x){
-    if (guard('log', c, x)) return;
-    logData = x.body.logs || [];
-    paintLog();
-  });
+  logData = []; logPage = 1; logTotal = 0; logHasMore = false;
+  reloadLog(1);
 }
-var logData = [];
+var logData = [], logPage = 1, logTotal = 0, logHasMore = false;
 function paintLog(){
   var q = ($('#lq') ? ($('#lq').value || '') : '').toLowerCase();
   var list = logData.filter(function(l){ return !q || l.toLowerCase().indexOf(q) >= 0; });
   var box = $('#logBox');
-  if (box) box.textContent = list.join('\n') || '暂无日志';
+  if (box) box.textContent = list.join('\n') || (logTotal ? '当前页没有匹配日志' : '暂无日志');
+  var pg = $('#lPage'); if (pg) pg.textContent = '第 ' + logPage + ' 页 / 共 ' + logTotal + ' 条';
+  var prev = $('#lPrev'), next = $('#lNext');
+  if (prev) prev.disabled = logPage <= 1;
+  if (next) next.disabled = !logHasMore;
 }
-/* 「刷新」以前调 paintLog(true)，但 force 参数根本没被使用——点刷新只有本地重排，
-   一个网络请求都不发，新日志永远看不到，看起来就像「日志丢了一堆」。 */
-function reloadLog(){
+function reloadLog(page){
+  page = Math.max(1, parseInt(page || 1, 10) || 1);
   var box = $('#logBox');
-  if (box && !logData.length) box.textContent = '加载中…';
-  api('/api/logs').then(function(x){
+  if (box) box.textContent = '加载中…';
+  var size = $('#lSize') ? ($('#lSize').value || '200') : '200';
+  var qs = 'page=' + page + '&size=' + encodeURIComponent(size);
+  var f = $('#lFrom') ? $('#lFrom').value : '';
+  var t = $('#lTo') ? $('#lTo').value : '';
+  if (f) qs += '&from=' + encodeURIComponent(f);
+  if (t) qs += '&to=' + encodeURIComponent(t);
+  api('/api/logs?' + qs).then(function(x){
     if (!onPage('log')) return;
     if (bad(x)) { if (box) box.textContent = '日志读取失败：' + ((x.body && x.body.error) || '请检查服务端存储配置'); return; }
     logData = x.body.logs || [];
+    logPage = x.body.page || page;
+    logTotal = x.body.total || 0;
+    logHasMore = !!x.body.hasMore;
     paintLog();
   });
 }
@@ -770,10 +786,7 @@ function logAuto(){
   if ($('#lAuto') && $('#lAuto').checked) {
     window._logTimer = setInterval(function(){
       if (state.page !== 'log') { stopLogTimer(); return; }
-      api('/api/logs').then(function(x){
-        if (!onPage('log') || bad(x)) return;
-        logData = x.body.logs || []; paintLog();
-      });
+      reloadLog(1);
     }, 5000);
   }
 }
