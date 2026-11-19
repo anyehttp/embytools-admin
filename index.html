@@ -786,7 +786,7 @@ function logAuto(){
   if ($('#lAuto') && $('#lAuto').checked) {
     window._logTimer = setInterval(function(){
       if (state.page !== 'log') { stopLogTimer(); return; }
-      reloadLog(1);
+      if (logPage === 1) reloadLog(1); // 翻到历史页时不要被自动刷新拽回第一页
     }, 5000);
   }
 }
