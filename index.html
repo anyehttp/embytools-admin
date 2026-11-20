@@ -211,6 +211,22 @@ var PAGES = [
    否则同机页面改写 BK 后，下一次请求就会把 Bearer 令牌和密码引到任意主机。
    未登录时 state.base 为空，api() 直接拒绝发请求。 */
 function bk(){ return state.base || ''; }
+/* 页面刷新后 sessionStorage 里的登录令牌还在，但 state.base 是内存变量。
+   以前 boot() 只把 localStorage 的地址填进输入框、没写回 state.base，
+   于是 enter() 之后所有请求都被 api() 的「未登录或无地址」分支拦下，
+   点「重新检测」「重试」也不会发任何网络请求。
+   这里统一兜底：能从 localStorage 取回合法地址就恢复，取不到才回登录页。 */
+function ensureBase(){
+  if (state.base) return true;
+  var b = '';
+  try { b = localStorage.getItem('BK') || ''; } catch (e) { b = ''; }
+  if (b && baseOk(b)) {
+    state.base = b;
+    try { sessionStorage.setItem('lb', b); } catch (e) {}
+    return true;
+  }
+  return false;
+}
 /* 云函数地址白名单：只接受 https（本地调试放行 http://127.0.0.1 与 localhost）。
    以前这个地址在任何校验之前就写进 localStorage，一旦被同机某个本地页面改写，
    下次登录就会把明文密码 POST 到攻击者的地址上。 */
@@ -284,7 +300,10 @@ function errHtml(x){
     '<div class="muted" style="font-size:12px;margin-top:8px">' + esc(tip) + '</div>' +
     '<div class="retry"><button class="btn sm" onclick="retryPage()">重试</button></div></div>';
 }
-function retryPage(){ go(state.page); }
+function retryPage(){
+  if (!ensureBase()) { logout(true); return; }
+  go(state.page);
+}
 /* 写操作成功后按「当前页」重绘：以前一律 renderXxx($('#content'))，
    用户在请求飞行中切了页，旧回调会把新页面的内容整块换掉
    （标题还是新页标题、内容却是旧页数据）。 */
@@ -303,6 +322,12 @@ function guard(id, c, x){
 function checkStorage(){
   var bar = $('#storeBar');
   if (!bar) return;
+  if (!ensureBase()) {
+    bar.className = 'hintbar warn';
+    bar.innerHTML = '<span class="grow">⚠ 当前页面没有可用的服务地址，请重新登录后再检测。</span>';
+    logout(true);
+    return;
+  }
   api('/api/stats').then(function(x){
     if (x && x.code === 401) {
       // 不能直接 return：api() 的登出只把遮罩去掉，状态条会永远停在
@@ -360,7 +385,7 @@ function doLogin(){
   api('/api/login', { username: u, password: p }, 'POST').then(function(x){
     if (x.body && x.body.ok) {
       state.token = x.body.token;
-      try { sessionStorage.setItem('ltk', state.token); } catch (e) {}
+      try { sessionStorage.setItem('ltk', state.token); sessionStorage.setItem('lb', base); } catch (e) {}
       localStorage.setItem('BK', base);
       localStorage.setItem('lu', u);
       localStorage.setItem('lp', p);
@@ -374,7 +399,7 @@ function doLogin(){
 function logout(expired){
   state.token = '';
   state.base = '';
-  try { sessionStorage.removeItem('ltk'); } catch (e) {}
+  try { sessionStorage.removeItem('ltk'); sessionStorage.removeItem('lb'); } catch (e) {}
   // 退出登录必须把「记住的地址/账号/密码」一起清掉，否则共用电脑上重开页面会自动登录。
   try {
     localStorage.removeItem('BK');
@@ -1032,8 +1057,22 @@ document.addEventListener('keydown', function(e){
   if (u) $('#lUser').value = u;
   var p = localStorage.getItem('lp');
   if (p) $('#lPass').value = p;
-  if (state.token && !tokenExp()) { enter(); }
-  else if (base && u && p) setTimeout(doLogin, 400);
+  var sb = '';
+  try { sb = sessionStorage.getItem('lb') || ''; } catch (e) { sb = ''; }
+  if (state.token && !tokenExp()) {
+    // 令牌必须和一个合法服务地址一起恢复，否则 api() 会在发请求前直接拒绝，
+    // 页面看起来「已登录」却怎么点都不发请求。旧会话没有 lb 时用 BK 补一次。
+    if (!sb || !baseOk(sb)) { sb = base && baseOk(base) ? base : ''; }
+    if (sb) {
+      state.base = sb;
+      try { sessionStorage.setItem('lb', sb); } catch (e) {}
+      enter();
+    } else {
+      state.token = '';
+      try { sessionStorage.removeItem('ltk'); sessionStorage.removeItem('lb'); } catch (e) {}
+      $('#lErr').textContent = '登录状态已失效，请重新登录';
+    }
+  } else if (base && u && p) setTimeout(doLogin, 400);
 })();
 </script>
 </body>
